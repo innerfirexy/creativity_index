@@ -16,10 +16,11 @@ print('torch version:', torch.__version__)
 # %%
 # Load model and tokenizer
 # Note: You need to adjust the model path according to your environment
+model_name = 'llama3-8b-instruct'
 if platform.system() == 'Darwin':
-    model_path = '/Users/xy/models/llama3-8b-base'  # Please modify according to actual situation
+    model_path = f'/Users/xy/models/{model_name}'  # Please modify according to actual situation
 else:
-    model_path = '/data1/model/llama3-8b-base'  # Please modify according to actual situation
+    model_path = f'/data2/model/{model_name}'  # Please modify according to actual situation
 
 assert os.path.exists(model_path)
 
@@ -41,12 +42,11 @@ def text_to_nlls(text, tokenizer, model):
     device = model.device
     ids = tokenizer.encode(text, return_tensors='pt', add_special_tokens=True).to(device)
 
-    # Forward
+    # Forward pass
     try:
         output = model(ids)
     except Exception:
         raise
-    
     logits = output.logits.to(device)
     logits = logits.permute(0, 2, 1) # reshape logits from (B, L, V) to (B, V, L)
     shift_logits = logits[:, :, :-1]
@@ -64,38 +64,21 @@ def text_to_nlls(text, tokenizer, model):
     return nlls.detach().cpu().numpy()
 
 
+
 # %%
 def exp_poem_human():
     # Load poetry data
-    input_file = 'data/poem/Human_poem.json'
-
-    print('Loading poetry data...')
+    input_file = './poem/Human_poem.json'
+    assert os.path.exists(input_file)
     with open(input_file, 'r', encoding='utf-8') as f:
         poems_data = json.load(f)
 
-    print(f'Total loaded {len(poems_data)} poems')
-
-
     # Extract text
-    print('Extracting poetry text...')
     all_texts = []
-    poem_info = []
-
     for i, poem in enumerate(poems_data):
         text = poem.get('text', '')
-        prompt = poem.get('prompt', '')
-        
         if text.strip():  # Only process non-empty text
             all_texts.append(text)
-            poem_info.append({
-                'index': i,
-                'text': text,
-                'prompt': prompt,
-                'char_count': len(text),
-                'word_count': len(text.split())
-            })
-
-    print(f'Valid poetry count: {len(all_texts)}')
 
     # Calculate NLL
     print('tokenizing...')
@@ -120,13 +103,48 @@ def exp_poem_human():
         assert len(nlls) == len(all_token_ids[i])
 
     # Save results
-    output_text_file = 'poem_Human_llama3-base.txt'
+    output_text_file = f'poem_Human_{model_name}.txt'
     for i, nlls in enumerate(all_nlls):
         with open(output_text_file, 'a') as f:
             f.write(' '.join(f'{nll:.5f}' for nll in nlls) + '\n')
 
 # %%
+def exp_poem_models():
+    input_files = ['./poem/ChatGPT_poem.json',
+        './poem/GPT3_poem.json',
+        './poem/Llama2-70B-chat_poem.json',
+        './poem/Olmo-7B-instruct_poem.json',
+        './poem/Tulu2-dpo-70B_poem.json',
+    ]
+    for input_file in input_files:
+        assert os.path.exists(input_file)
+
+    for input_file in input_files:
+        with open(input_file, 'r', encoding='utf-8') as f:
+            poems_data = json.load(f)
+        # Extract text 
+        all_texts = [poem.get('text', '') for poem in poems_data]
+
+        # Compute NLL
+        print(f'computing {input_file}...')
+        all_nlls = []
+        for text in tqdm(all_texts):
+            nlls = text_to_nlls(text, tokenizer, model)
+            all_nlls.append(nlls) 
+
+        # Save intermediate
+        pickle.dump(all_nlls, open(f'{input_file.split("/")[-1].split(".")[0]}_{model_name}.pkl', 'wb'))
+
+        # Save results
+        output_text_file = f'{input_file.split("/")[-1].split(".")[0]}_{model_name}.txt'
+        for i, nlls in enumerate(all_nlls):
+            with open(output_text_file, 'a') as f:
+                f.write(' '.join(f'{nll:.5f}' for nll in nlls) + '\n')
+        print(f'Saved {output_text_file}')
+
+# %%
 # Run the experiment
 if __name__ == '__main__':
-    exp_poem_human()
+    # exp_poem_human()
+    exp_poem_models()
 
