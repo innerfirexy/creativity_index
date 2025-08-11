@@ -103,9 +103,9 @@ def exp_poem_human():
         assert len(nlls) == len(all_token_ids[i])
 
     # Save results
-    output_text_file = f'poem_Human_{model_name}.txt'
-    for i, nlls in enumerate(all_nlls):
-        with open(output_text_file, 'a') as f:
+    output_text_file = f'Human_poem_{model_name}.txt'
+    with open(output_text_file, 'w') as f:
+        for nlls in all_nlls:
             f.write(' '.join(f'{nll:.5f}' for nll in nlls) + '\n')
 
 # %%
@@ -137,8 +137,8 @@ def exp_poem_models():
 
         # Save results
         output_text_file = f'{input_file.split("/")[-1].split(".")[0]}_{model_name}.txt'
-        for i, nlls in enumerate(all_nlls):
-            with open(output_text_file, 'a') as f:
+        with open(output_text_file, 'w') as f:
+            for nlls in all_nlls:
                 f.write(' '.join(f'{nll:.5f}' for nll in nlls) + '\n')
         print(f'Saved {output_text_file}')
 
